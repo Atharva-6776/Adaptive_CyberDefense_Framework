@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cyberdefense_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cyberdefense
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyberdefense_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=cyberdefense
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/cyberdefense
+      - JWT_SECRET_KEY=supersecretaccesskeyplaceholder_please_change_in_production
+      - JWT_REFRESH_SECRET_KEY=supersecretrefreshkeyplaceholder_please_change_in_production
+      - MTD_ENABLED=True
+      - MTD_ROTATION_INTERVAL_SECONDS=60
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

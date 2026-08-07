@@ -1,0 +1,128 @@
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.core.config import settings
+from app.core.database import Base, engine
+from app.core.logging import setup_logging
+from app.routers.auth import router as auth_router
+from app.routers.mtd import router as mtd_router
+from app.services.mtd_service import mtd_service
+
+# Setup logging config
+setup_logging()
+logger = logging.getLogger("app")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup actions
+    logger.info("Initializing database tables...")
+    Base.metadata.create_all(bind=engine)
+    
+    logger.info("Starting MTD rotation scheduler...")
+    await mtd_service.start_rotation_scheduler()
+    
+    yield
+    
+    # Shutdown actions
+    logger.info("Stopping MTD rotation scheduler...")
+    await mtd_service.stop_rotation_scheduler()
+
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    description="Adaptive Cyber Defense Framework - Backend Foundation with JWT Auth and Moving Target Defense (MTD)",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS configuration
+if settings.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+# MTD path translation and honeypot interception middleware
+@app.middleware("http")
+async def mtd_middleware(request: Request, call_next):
+    path = request.url.path
+    
+    # Bypass MTD interception for docs and schema
+    if path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi.json"):
+        return await call_next(request)
+
+    # 1. Decoy path honeypot trap
+    if path in mtd_service.decoy_paths:
+        client_host = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
+        headers = dict(request.headers)
+        
+        mtd_service.log_honeypot_trigger(
+            path=path,
+            ip_address=client_host,
+            user_agent=user_agent,
+            headers=headers
+        )
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "Not Found"}
+        )
+
+    # 2. Dynamic path decoding/rewriting
+    if path in mtd_service.active_routes:
+        real_path = mtd_service.active_routes[path]
+        logger.info(f"MTD Router: translating dynamic path {path} -> {real_path}")
+        
+        # Rewrite the ASGI scope path so FastAPI routers match the real endpoint
+        request.scope["path"] = real_path
+        # Mark request context to identify it went through dynamic translation
+        request.state.is_dynamic_route = True
+        
+        response = await call_next(request)
+        return response
+
+    # 3. Direct access block for protected paths
+    if path in mtd_service.protected_paths:
+        if mtd_service.enabled:
+            # Under MTD, direct calls to real endpoints are blocked and logged as decoy triggers
+            client_host = request.client.host if request.client else "unknown"
+            user_agent = request.headers.get("user-agent", "unknown")
+            headers = dict(request.headers)
+            
+            logger.warning(f"Direct access attempt to protected path {path} blocked.")
+            mtd_service.log_honeypot_trigger(
+                path=path,
+                ip_address=client_host,
+                user_agent=user_agent,
+                headers=headers
+            )
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"detail": "Not Found"}
+            )
+
+    # Proceed normally for non-protected paths
+    response = await call_next(request)
+    return response
+
+
+# Include Routers
+app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(mtd_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "service": settings.PROJECT_NAME,
+        "docs_url": "/docs"
+    }
