@@ -1,0 +1,38 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+
+import DashboardLayout from "../layouts/DashboardLayout";
+
+import Dashboard from "../pages/Dashboard";
+import Login from "../pages/Login";
+import Cameras from "../pages/Cameras";
+import Alerts from "../pages/Alerts";
+import Security from "../pages/Security";
+import Reports from "../pages/Reports";
+import Settings from "../pages/Settings";
+
+import ProtectedRoute from "./ProtectedRoute";
+
+export default function AppRouter() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="cameras" element={<Cameras />} />
+        <Route path="alerts" element={<Alerts />} />
+        <Route path="security" element={<Security />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
