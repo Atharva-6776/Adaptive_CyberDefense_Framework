@@ -18,21 +18,28 @@ export default function StatCard({
   trendPositive = true,
 }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl backdrop-blur-sm transition duration-200 hover:border-slate-700">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-400">{title}</p>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl backdrop-blur-sm transition duration-200 hover:border-slate-700 flex flex-col justify-between min-h-[130px]">
+      <div className="flex items-start justify-between gap-3 min-w-0">
+        {/* Text content – must shrink, never overflow */}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 truncate">
+            {title}
+          </p>
 
-          <div className="mt-2 flex items-baseline gap-2">
-            <h2 className="text-3xl font-bold text-white tracking-tight">
+          {/* Value row */}
+          <div className="mt-2 flex flex-wrap items-baseline gap-2 min-w-0">
+            <h2
+              className="font-bold text-white tracking-tight break-all"
+              style={{ fontSize: "clamp(1rem, 2.5vw, 1.5rem)", lineHeight: "1.3" }}
+            >
               {value}
             </h2>
             {trend && (
               <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight whitespace-nowrap border ${
                   trendPositive
-                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                    : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : "bg-rose-500/10 text-rose-400 border-rose-500/20"
                 }`}
               >
                 {trend}
@@ -41,13 +48,14 @@ export default function StatCard({
           </div>
 
           {subtitle && (
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-1.5 text-xs text-slate-400 break-words">
               {subtitle}
             </p>
           )}
         </div>
 
-        <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/40 p-3.5 text-cyan-400 shadow-inner">
+        {/* Icon container – fixed size, never squishes text */}
+        <div className="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-500/20 bg-cyan-950/40 shadow-inner">
           {icon}
         </div>
       </div>
