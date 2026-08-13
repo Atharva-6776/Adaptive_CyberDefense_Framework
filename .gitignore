@@ -1,5 +1,6 @@
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -15,6 +16,11 @@ __pycache__/
 
 # Node
 node_modules/
+dist/
+
+# Logs and Uploads
+logs/
+uploads/
 
 # macOS
 .DS_Store

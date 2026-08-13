@@ -43,15 +43,28 @@ export default function CameraCard({ camera, onOpenDetails }: CameraCardProps) {
 
         {/* Video Preview Placeholder */}
         <div className={`mt-4 relative flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-gradient-to-br ${camera.previewBg}`}>
-          {/* Grid lines pattern */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:16px_16px]" />
+          {camera.status === "online" ? (
+            <img
+              src={`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/video/live/${camera.id}`}
+              alt={camera.name}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <>
+              {/* Grid lines pattern */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:16px_16px]" />
 
-          <div className="z-10 flex flex-col items-center gap-1.5 text-center">
-            <CameraIcon className="h-8 w-8 text-slate-600/80 group-hover:text-cyan-400 transition-colors" />
-            <span className="font-mono text-[11px] font-bold text-slate-400 tracking-wider uppercase">
-              {camera.resolution}
-            </span>
-          </div>
+              <div className="z-10 flex flex-col items-center gap-1.5 text-center">
+                <CameraIcon className="h-8 w-8 text-slate-600/80 group-hover:text-cyan-400 transition-colors" />
+                <span className="font-mono text-[11px] font-bold text-slate-400 tracking-wider uppercase">
+                  {camera.resolution}
+                </span>
+              </div>
+            </>
+          )}
 
           {/* Stream Overlay info */}
           <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded bg-black/60 px-2 py-0.5 backdrop-blur-md">

@@ -32,6 +32,9 @@ class MTDService:
             "/api/v1/auth/me",
             "/api/v1/auth/logout"
         ]
+        
+        # Load config and restore logs from database
+        self.load_config()
 
     def load_config(self) -> None:
         """Loads and syncs config with settings dynamic updates."""
@@ -40,6 +43,28 @@ class MTDService:
         self.decoy_paths = set(settings.MTD_DECOY_PATHS)
         self.seed = settings.MTD_SEED
         logger.info("MTD settings loaded / refreshed.")
+        
+        # Sync honeypot logs from database if database is configured/accessible
+        try:
+            from app.core.database import SessionLocal
+            from app.models.honeypot import HoneypotLog
+            db = SessionLocal()
+            try:
+                db_logs = db.query(HoneypotLog).order_by(HoneypotLog.timestamp.asc()).all()
+                self.honeypot_logs = [
+                    HoneypotLogEntry(
+                        id=log.id,
+                        decoy_path_triggered=log.decoy_path_triggered,
+                        ip_address=log.ip_address,
+                        user_agent=log.user_agent,
+                        timestamp=log.timestamp,
+                        headers_logged=log.headers_logged or {}
+                    ) for log in db_logs
+                ]
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Could not load honeypot logs from database: {str(e)}")
 
     def generate_dynamic_path(self, real_path: str, salt: str) -> str:
         """Generates a pseudo-random path for a real endpoint based on path, seed, and salt."""
@@ -132,12 +157,37 @@ class MTDService:
         # Sanitize/filter headers for security/privacy (optional)
         sanitized_headers = {k: v for k, v in headers.items() if k.lower() not in ["authorization", "cookie"]}
         
+        # Save to database
+        try:
+            from app.core.database import SessionLocal
+            from app.models.honeypot import HoneypotLog
+            db = SessionLocal()
+            try:
+                db_log = HoneypotLog(
+                    decoy_path_triggered=path,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    timestamp=datetime.now(timezone.utc),
+                    headers_logged=sanitized_headers
+                )
+                db.add(db_log)
+                db.commit()
+                db.refresh(db_log)
+                log_id = db_log.id
+                timestamp = db_log.timestamp
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to log honeypot trigger to database: {str(e)}")
+            log_id = len(self.honeypot_logs) + 1
+            timestamp = datetime.now(timezone.utc)
+
         entry = HoneypotLogEntry(
-            id=len(self.honeypot_logs) + 1,
+            id=log_id,
             decoy_path_triggered=path,
             ip_address=ip_address,
             user_agent=user_agent,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=timestamp,
             headers_logged=sanitized_headers
         )
         self.honeypot_logs.append(entry)

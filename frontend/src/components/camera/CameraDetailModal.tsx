@@ -50,11 +50,22 @@ export default function CameraDetailModal({ camera, onClose }: CameraDetailModal
         </div>
 
         {/* Big Feed simulation */}
-        <div className={`relative flex h-52 w-full items-center justify-center rounded-xl border border-slate-800 bg-gradient-to-br ${camera.previewBg}`}>
-          <div className="flex flex-col items-center gap-2 text-slate-400">
-            <CameraIcon className="h-12 w-12 text-cyan-400" />
-            <p className="font-mono text-xs">SURVEILLANCE FEED ACTIVE</p>
-          </div>
+        <div className={`relative flex h-52 w-full items-center justify-center rounded-xl border border-slate-800 overflow-hidden bg-gradient-to-br ${camera.previewBg}`}>
+          {camera.status === "online" ? (
+            <img
+              src={`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/video/live/${camera.id}`}
+              alt={camera.name}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-slate-400">
+              <CameraIcon className="h-12 w-12 text-slate-600" />
+              <p className="font-mono text-xs">STREAM OFFLINE</p>
+            </div>
+          )}
 
           <div className="absolute top-3 left-3 rounded bg-black/70 px-3 py-1 font-mono text-xs text-emerald-400 backdrop-blur-md">
             ● LIVE STREAM

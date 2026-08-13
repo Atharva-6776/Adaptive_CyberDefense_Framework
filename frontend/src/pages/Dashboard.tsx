@@ -1,22 +1,36 @@
 import { useEffect, useState } from "react";
-import { Shield, RefreshCw, Server, AlertCircle, UserCheck } from "lucide-react";
+import { Shield, RefreshCw, Server, UserCheck } from "lucide-react";
 import StatCard from "../components/dashboard/StatCard";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
+import CameraOverview from "../components/dashboard/CameraOverview";
+import RecentAlerts from "../components/dashboard/RecentAlerts";
 import { useAuthStore } from "../store/authStore";
 import { getMTDStatus, type MTDStatusResponse } from "../api/mtd";
+import { getCameras } from "../api/video";
+import { getAlerts } from "../api/alerts";
+import type { Camera, Alert } from "../types/dashboard";
 
 export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const [mtdStatus, setMtdStatus] = useState<MTDStatusResponse | null>(null);
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchDashboardData = async () => {
     try {
       setError(null);
-      const data = await getMTDStatus();
-      setMtdStatus(data);
+      const [statusData, cameraData, alertData] = await Promise.all([
+        getMTDStatus(),
+        getCameras(),
+        getAlerts(),
+      ]);
+      setMtdStatus(statusData);
+      setCameras(cameraData);
+      setAlerts(alertData);
     } catch (err: any) {
+      console.error("Dashboard fetch error:", err);
       setError("Backend connection error or unauthenticated");
     } finally {
       setLoading(false);
@@ -24,13 +38,24 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchStatus();
+    fetchDashboardData();
+    // Auto-refresh metrics every 5 seconds for real-time surveillance feel
+    const interval = setInterval(fetchDashboardData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="w-full min-w-0 space-y-8 text-white">
       {/* Header */}
-      <DashboardHeader onRefresh={fetchStatus} />
+      <DashboardHeader onRefresh={fetchDashboardData} />
+
+      {/* Dynamic Alert Banner if backend is unreachable */}
+      {error && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400">
+          <Server className="h-4 w-4 shrink-0 text-red-400" />
+          <span>{error}. Please check if the backend API service is running.</span>
+        </div>
+      )}
 
       {/* Real Information Cards — 4-col on xl, 2-col on md, 1-col on mobile */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
@@ -79,65 +104,10 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Backend Integration Pending Modules — equal-height grid */}
+      {/* Live Video Analytics and Alert Panels */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* Camera Surveillance Module Notice */}
-        <div className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl backdrop-blur-sm">
-          {/* Card header */}
-          <div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-800 pb-3">
-            <h3 className="flex min-w-0 shrink items-center gap-2 text-sm font-bold text-white">
-              <Server className="h-4 w-4 shrink-0 text-cyan-400" />
-              <span className="truncate">Camera Surveillance Engine</span>
-            </h3>
-            <span className="inline-flex shrink-0 items-center rounded-full border border-amber-500/20 bg-slate-800 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400 whitespace-nowrap">
-              Pending
-            </span>
-          </div>
-
-          {/* Empty-state body – flex-1 so both panels grow to the same height */}
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center rounded-lg border border-slate-800/80 bg-slate-950/50 p-8 text-center">
-            <AlertCircle className="mb-3 h-10 w-10 text-slate-500" />
-            <p className="text-sm font-medium text-slate-300">
-              Video endpoints are not configured on the backend.
-            </p>
-            <p className="mt-1 max-w-sm text-xs text-slate-500">
-              Real camera streaming &amp; AI video analytics will be enabled when
-              backend video endpoints are deployed.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-[10px] font-mono font-semibold text-amber-400">
-              Backend integration pending
-            </span>
-          </div>
-        </div>
-
-        {/* Alert Telemetry Module Notice */}
-        <div className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl backdrop-blur-sm">
-          {/* Card header */}
-          <div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-800 pb-3">
-            <h3 className="flex min-w-0 shrink items-center gap-2 text-sm font-bold text-white">
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
-              <span className="truncate">Alert &amp; Incident Telemetry</span>
-            </h3>
-            <span className="inline-flex shrink-0 items-center rounded-full border border-amber-500/20 bg-slate-800 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400 whitespace-nowrap">
-              Pending
-            </span>
-          </div>
-
-          {/* Empty-state body */}
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center rounded-lg border border-slate-800/80 bg-slate-950/50 p-8 text-center">
-            <AlertCircle className="mb-3 h-10 w-10 text-slate-500" />
-            <p className="text-sm font-medium text-slate-300">
-              Alerts service endpoint pending integration.
-            </p>
-            <p className="mt-1 max-w-sm text-xs text-slate-500">
-              Real security events and honeypot intrusion triggers will be
-              displayed here when live alert APIs are linked.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-[10px] font-mono font-semibold text-amber-400">
-              Backend integration pending
-            </span>
-          </div>
-        </div>
+        <CameraOverview cameras={cameras} />
+        <RecentAlerts alerts={alerts} />
       </div>
     </div>
   );

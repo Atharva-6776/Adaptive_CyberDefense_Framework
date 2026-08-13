@@ -6,13 +6,19 @@ services:
     container_name: cyberdefense_db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: cyberdefense
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-cyberdefense}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-cyberdefense}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   backend:
     build:
@@ -24,16 +30,35 @@ services:
       - "8000:8000"
     environment:
       - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=cyberdefense
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/cyberdefense
-      - JWT_SECRET_KEY=supersecretaccesskeyplaceholder_please_change_in_production
-      - JWT_REFRESH_SECRET_KEY=supersecretrefreshkeyplaceholder_please_change_in_production
-      - MTD_ENABLED=True
-      - MTD_ROTATION_INTERVAL_SECONDS=60
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-cyberdefense}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-cyberdefense}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretaccesskeyplaceholder_please_change_in_production}
+      - JWT_REFRESH_SECRET_KEY=${JWT_REFRESH_SECRET_KEY:-supersecretrefreshkeyplaceholder_please_change_in_production}
+      - MTD_ENABLED=${MTD_ENABLED:-True}
+      - MTD_ROTATION_INTERVAL_SECONDS=${MTD_ROTATION_INTERVAL_SECONDS:-60}
+      - MODEL_PATH=/workspace/ai-engine/models/best.pt
+    volumes:
+      - ./ai-engine/models:/workspace/ai-engine/models:ro
+      - uploads_data:/workspace/uploads
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+    container_name: cyberdefense_frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
+  uploads_data:

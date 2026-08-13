@@ -8,6 +8,6 @@ export interface DashboardMetrics {
 }
 
 export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
-  const response = await api.get("/video/metrics");
+  const response = await api.get("/api/v1/video/metrics");
   return response.data;
 };

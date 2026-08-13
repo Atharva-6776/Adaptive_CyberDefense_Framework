@@ -7,11 +7,14 @@ import {
   AlertTriangle,
   Lock,
   Layers,
+  Eye,
 } from "lucide-react";
 import { getMTDStatus, triggerMTDRotation, type MTDStatusResponse } from "../api/mtd";
+import { getHoneypotLogs, type HoneypotLogEntry } from "../api/security";
 
 export default function Security() {
   const [mtdStatus, setMtdStatus] = useState<MTDStatusResponse | null>(null);
+  const [honeypotLogs, setHoneypotLogs] = useState<HoneypotLogEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRotating, setIsRotating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +23,12 @@ export default function Security() {
   const fetchStatus = async () => {
     try {
       setError(null);
-      const data = await getMTDStatus();
-      setMtdStatus(data);
+      const [statusData, logsData] = await Promise.all([
+        getMTDStatus(),
+        getHoneypotLogs(),
+      ]);
+      setMtdStatus(statusData);
+      setHoneypotLogs(logsData);
     } catch (err: any) {
       setError("Failed to fetch live MTD status from backend.");
     } finally {
@@ -283,6 +290,44 @@ export default function Security() {
             <p className="text-xs text-slate-400">No rotation history recorded yet.</p>
           )}
         </div>
+      </div>
+
+      {/* Honeypot Telemetry Log Table */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl backdrop-blur-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-rose-400" />
+            <h2 className="text-lg font-bold text-white">Honeypot Intrusion Telemetry</h2>
+          </div>
+          <span className="text-xs text-slate-400 font-mono">{honeypotLogs.length} EVENTS</span>
+        </div>
+
+        {honeypotLogs.length > 0 ? (
+          <div className="overflow-x-auto max-h-72 overflow-y-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase">
+                  <th className="py-2.5 px-3">Decoy Path</th>
+                  <th className="py-2.5 px-3">Source IP</th>
+                  <th className="py-2.5 px-3">User-Agent</th>
+                  <th className="py-2.5 px-3 text-right">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {honeypotLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-800/30 font-mono">
+                    <td className="py-2.5 px-3 text-rose-400 font-bold">{log.decoy_path_triggered}</td>
+                    <td className="py-2.5 px-3 text-slate-300">{log.ip_address}</td>
+                    <td className="py-2.5 px-3 text-slate-400 max-w-[200px] truncate">{log.user_agent || "N/A"}</td>
+                    <td className="py-2.5 px-3 text-right text-slate-500">{new Date(log.timestamp).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400">No honeypot intrusion events recorded yet.</p>
+        )}
       </div>
     </div>
   );
