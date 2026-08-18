@@ -70,8 +70,13 @@ def test_get_profile_mtd_interception_and_success(client):
     access_token = tokens["access_token"]
     headers = {"Authorization": f"Bearer {access_token}"}
 
-    # 1. Direct access to `/api/v1/auth/me` should be blocked/404 under MTD
-    direct_resp = client.get("/api/v1/auth/me", headers=headers)
+    # 1. Direct access to `/api/v1/auth/me` should be blocked/404 under MTD.
+    #    Use a throwaway X-Forwarded-For IP so the risk engine block does not
+    #    fall on the "testclient" host and break the rest of this test.
+    direct_resp = client.get(
+        "/api/v1/auth/me",
+        headers={**headers, "x-forwarded-for": "99.88.77.66"}
+    )
     assert direct_resp.status_code == status.HTTP_404_NOT_FOUND
 
     # 2. Query MTD status to discover active dynamic path (we can query MTD status route)

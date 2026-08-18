@@ -194,6 +194,25 @@ class MTDService:
         logger.warning(
             f"SECURITY ALERT - HONEYPOT TRIGGERED: Decoy Path={path}, IP={ip_address}, UA={user_agent}"
         )
+        
+        # Record event in threat mitigation engine AND risk engine
+        try:
+            from app.core.database import SessionLocal
+            from app.services.threat_mitigation import threat_mitigation_service
+            from app.services.threat_correlation import threat_correlation
+            db = SessionLocal()
+            try:
+                threat_mitigation_service.record_event(
+                    db=db,
+                    ip_address=ip_address,
+                    reason=f"Honeypot trigger on decoy path: {path}"
+                )
+                threat_correlation.on_honeypot_hit(db=db, ip_address=ip_address, path=path)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to record threat mitigation event: {str(e)}")
+
         return entry
 
     def get_status(self) -> MTDStatusResponse:

@@ -53,10 +53,14 @@ class Settings(BaseSettings):
     ]
     MTD_SEED: str = "adaptive-defense-framework-seed"
     MTD_ROTATION_HISTORY_LIMIT: int = 10
-
     # AI / Video Surveillance Settings
     MODEL_PATH: str = "ai-engine/models/best.pt"
     UPLOAD_DIR: str = "uploads"
+
+    # Threat Mitigation Settings
+    THREAT_DETECTION_WINDOW_SECONDS: int = 10
+    THREAT_HONEYPOT_THRESHOLD: int = 3
+    THREAT_BLOCK_DURATION_SECONDS: int = 600
 
     model_config = SettingsConfigDict(
         env_file=".env",
