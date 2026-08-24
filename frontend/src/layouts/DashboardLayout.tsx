@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { logoutApi } from "../api/auth";
+import { CyberDefenseBackground } from "../components/3d/CyberDefenseBackground";
+import { useScrollProgress } from "../components/3d/useScrollProgress";
 
 const menuItems = [
   { name: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -24,6 +26,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { scrollProgress, scrollRef } = useScrollProgress();
 
   const handleLogout = async () => {
     await logoutApi();
@@ -36,10 +39,12 @@ export default function DashboardLayout() {
 
   return (
     /* Root: full viewport, no overflow */
-    <div className="flex h-screen overflow-hidden bg-slate-950 text-white">
+    <div className="relative flex h-screen overflow-hidden bg-slate-950/80 text-white">
+      {/* Premium 3D Scroll-Reactive Background Canvas */}
+      <CyberDefenseBackground scrollProgress={scrollProgress} />
 
       {/* ── Sidebar ──────────────────────────────────────────────── */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900 overflow-y-auto">
+      <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900/90 backdrop-blur-md overflow-y-auto">
         {/* Brand */}
         <div className="border-b border-slate-800 px-5 py-5">
           <h1 className="text-base font-bold leading-tight text-cyan-400">
@@ -82,10 +87,10 @@ export default function DashboardLayout() {
       </aside>
 
       {/* ── Main area ────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900 px-6">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6">
           <h2 className="truncate text-base font-semibold text-white">
             Dashboard
           </h2>
@@ -113,7 +118,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Scrollable page content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <main ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="mx-auto w-full max-w-screen-2xl px-6 py-8">
             <Outlet />
           </div>
@@ -121,4 +126,4 @@ export default function DashboardLayout() {
       </div>
     </div>
   );
-}
+}
