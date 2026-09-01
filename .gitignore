@@ -27,3 +27,8 @@ uploads/
 
 # Windows
 Thumbs.db
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+

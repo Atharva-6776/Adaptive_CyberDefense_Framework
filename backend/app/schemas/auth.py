@@ -38,3 +38,10 @@ class RefreshTokenRequest(BaseModel):
 
 class LogoutResponse(BaseModel):
     message: str = "Successfully logged out"
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6, description="Password must be at least 6 characters")

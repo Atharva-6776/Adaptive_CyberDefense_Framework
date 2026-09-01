@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import jwt
 from sqlalchemy.orm import Session
 
@@ -48,17 +48,50 @@ class AuthService:
             logger.warning(f"Authentication failed: User {email} is inactive.")
             raise ValueError("User account is inactive")
 
+        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+            logger.warning(f"Authentication failed: User {email} is locked out until {user.locked_until}.")
+            raise ValueError("Account is temporarily locked due to too many failed attempts")
+
         if not verify_password(plain_password, user.hashed_password):
+            user.failed_logins += 1
+            if user.failed_logins >= 5:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                logger.warning(f"User {email} locked out due to multiple failed attempts.")
+            db.commit()
             logger.warning(f"Authentication failed: Incorrect password for {email}.")
             raise ValueError("Incorrect email or password")
+
+        if user.failed_logins > 0 or user.locked_until:
+            user.failed_logins = 0
+            user.locked_until = None
+            db.commit()
 
         logger.info(f"User authenticated successfully: ID {user.id}, Email {user.email}")
         return user
 
     @staticmethod
-    def create_tokens_for_user(user: User) -> TokenResponse:
+    def create_tokens_for_user(db: Session, user: User, ip_address: str = None, device_info: str = None) -> TokenResponse:
+        from app.models.user import ActiveSession
         access_token = create_access_token(user_id=user.id, role=user.role)
         refresh_token = create_refresh_token(user_id=user.id, role=user.role)
+        
+        try:
+            payload = jwt.decode(refresh_token, options={"verify_signature": False})
+            exp_timestamp = payload.get("exp")
+            expires_at = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc) if exp_timestamp else datetime.now(timezone.utc) + timedelta(days=7)
+        except Exception:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+        session_entry = ActiveSession(
+            user_id=user.id,
+            refresh_token=refresh_token,
+            ip_address=ip_address,
+            device_info=device_info,
+            expires_at=expires_at
+        )
+        db.add(session_entry)
+        db.commit()
+        
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -99,11 +132,22 @@ class AuthService:
         return False
 
     @staticmethod
-    def refresh_access_token(db: Session, refresh_token: str) -> str:
-        # Check if blacklisted
-        if AuthService.is_token_blacklisted(db, refresh_token):
-            logger.warning("Attempted to refresh access token using a blacklisted refresh token.")
-            raise ValueError("Refresh token has been revoked")
+    def refresh_access_token(db: Session, refresh_token: str, ip_address: str = None, device_info: str = None) -> TokenResponse:
+        from app.models.user import ActiveSession
+        # Check reuse
+        is_blacklisted = AuthService.is_token_blacklisted(db, refresh_token)
+        session_entry = db.query(ActiveSession).filter(ActiveSession.refresh_token == refresh_token).first()
+        
+        if is_blacklisted or (session_entry and session_entry.is_revoked):
+            # Token Reuse Detected! Revoke all sessions for user.
+            logger.critical(f"Token reuse detected for refresh token! Revoking all sessions.")
+            if session_entry:
+                db.query(ActiveSession).filter(ActiveSession.user_id == session_entry.user_id).update({"is_revoked": True})
+                db.commit()
+            raise ValueError("Refresh token has been revoked. All sessions terminated.")
+            
+        if not session_entry:
+            raise ValueError("Invalid session")
 
         try:
             payload = decode_token(refresh_token, is_refresh=True)
@@ -118,14 +162,58 @@ class AuthService:
         if not user or not user.is_active:
             raise ValueError("User not found or inactive")
 
-        # Generate a new access token
-        new_access_token = create_access_token(user_id=user.id, role=user.role)
-        logger.info(f"Token refreshed successfully for user ID {user.id}")
-        return new_access_token
+        # Revoke old token and session
+        AuthService.blacklist_token(db, refresh_token, "refresh")
+        session_entry.is_revoked = True
+        db.commit()
+
+        # Generate new tokens
+        return AuthService.create_tokens_for_user(db, user, ip_address, device_info)
 
     @staticmethod
     def logout(db: Session, access_token: str, refresh_token: str) -> None:
+        from app.models.user import ActiveSession
         # Blacklist both tokens
         AuthService.blacklist_token(db, access_token, "access")
         AuthService.blacklist_token(db, refresh_token, "refresh")
+        
+        session_entry = db.query(ActiveSession).filter(ActiveSession.refresh_token == refresh_token).first()
+        if session_entry:
+            session_entry.is_revoked = True
+            db.commit()
+            
         logger.info("User logged out successfully and tokens revoked.")
+
+    @staticmethod
+    def request_password_reset(db: Session, email: str) -> None:
+        import secrets
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return
+
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        db.commit()
+        
+        logger.info(f"Password reset requested for {email}. Token: {token}")
+
+    @staticmethod
+    def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
+        user = db.query(User).filter(User.reset_token == token).first()
+        if not user:
+            raise ValueError("Invalid or expired reset token")
+            
+        if user.reset_token_expires and user.reset_token_expires < datetime.now(timezone.utc):
+            raise ValueError("Reset token has expired")
+            
+        user.hashed_password = hash_password(new_password)
+        user.reset_token = None
+        user.reset_token_expires = None
+        user.failed_logins = 0
+        user.locked_until = None
+        
+        from app.models.user import ActiveSession
+        db.query(ActiveSession).filter(ActiveSession.user_id == user.id).update({"is_revoked": True})
+        db.commit()
+        logger.info(f"Password reset successful for {user.email}. All previous sessions revoked.")

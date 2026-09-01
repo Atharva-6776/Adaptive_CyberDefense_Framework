@@ -173,3 +173,84 @@ def test_repeated_requests_no_unnecessary_blocks(client, db_session):
     # Verify that the block's expires_at is not extended unnecessarily
     db_session.refresh(block_before)
     assert block_before.expires_at == expires_at_before
+
+
+def _get_admin_token(client):
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "admin@defense.com", "password": "adminpass", "role": "admin"}
+    )
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@defense.com", "password": "adminpass"}
+    )
+    return resp.json()["access_token"]
+
+
+def test_manual_block_ip_success(client):
+    token = _get_admin_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Manually block
+    resp = client.post(
+        "/api/v1/security/blocks/10.0.0.9/block",
+        headers=headers,
+        json={"reason": "Manual test", "duration_minutes": 60}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["status"] == "blocked"
+    assert data["reason"] == "Manual test"
+
+    # Verify IP is blocked
+    resp_blocked = client.get("/", headers={"x-forwarded-for": "10.0.0.9"})
+    assert resp_blocked.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_manual_unblock_ip_success(client):
+    token = _get_admin_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Block first
+    client.post(
+        "/api/v1/security/blocks/10.0.0.10/block",
+        headers=headers,
+        json={"reason": "To be unblocked", "duration_minutes": 60}
+    )
+    
+    # Verify blocked
+    resp_blocked = client.get("/", headers={"x-forwarded-for": "10.0.0.10"})
+    assert resp_blocked.status_code == status.HTTP_403_FORBIDDEN
+
+    # Manually unblock
+    resp = client.post(
+        "/api/v1/security/blocks/10.0.0.10/unblock",
+        headers=headers
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["status"] == "unblocked"
+
+    # Verify unblocked
+    resp_unblocked = client.get("/", headers={"x-forwarded-for": "10.0.0.10"})
+    assert resp_unblocked.status_code == status.HTTP_200_OK
+
+
+def test_manual_block_requires_admin(client):
+    # Register analyst
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "analyst2@defense.com", "password": "analystpass", "role": "analyst"}
+    )
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "analyst2@defense.com", "password": "analystpass"}
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    resp = client.post(
+        "/api/v1/security/blocks/10.0.0.11/block",
+        headers=headers,
+        json={"reason": "Analyst block", "duration_minutes": 60}
+    )
+    assert resp.status_code == status.HTTP_403_FORBIDDEN

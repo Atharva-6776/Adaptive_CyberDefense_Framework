@@ -214,6 +214,20 @@ class RiskEngine:
             )
             db.add(event)
             db.commit()
+            
+            # Dispatch external alert
+            try:
+                from app.services.notification_dispatcher import notification_dispatcher
+                notification_dispatcher.dispatch(
+                    db=db,
+                    event_type="threat_critical",
+                    subject="CRITICAL Threat Detected",
+                    message=f"CRITICAL threat detected from IP {ip_address} with score {score:.1f}. IP blocked for 30 minutes.",
+                    reference_id=ip_address
+                )
+            except Exception as e:
+                logger.error(f"[RiskEngine] Failed to dispatch alert: {e}")
+
             logger.critical(
                 f"[RiskEngine] CRITICAL threat for IP={ip_address}. "
                 f"30-minute block + token invalidation triggered."

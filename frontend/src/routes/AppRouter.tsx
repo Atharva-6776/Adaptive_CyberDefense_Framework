@@ -7,6 +7,7 @@ import Login from "../pages/Login";
 import Cameras from "../pages/Cameras";
 import Alerts from "../pages/Alerts";
 import Security from "../pages/Security";
+import ThreatAnalytics from "../pages/ThreatAnalytics";
 import Reports from "../pages/Reports";
 import Settings from "../pages/Settings";
 
@@ -28,6 +29,7 @@ export default function AppRouter() {
         <Route path="cameras" element={<Cameras />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="security" element={<Security />} />
+        <Route path="threats" element={<ThreatAnalytics />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
       </Route>

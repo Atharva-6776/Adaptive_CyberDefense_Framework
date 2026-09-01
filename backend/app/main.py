@@ -12,7 +12,14 @@ from app.routers.mtd import router as mtd_router
 from app.routers.video import router as video_router
 from app.routers.alerts import router as alerts_router
 from app.routers.security_analytics import router as security_analytics_router
+from app.routers.notifications import router as notifications_router
+from app.routers.audit import router as audit_router
+from app.routers.rbac import router as rbac_router
 from app.services.mtd_service import mtd_service
+
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from app.core.rate_limit import limiter
 
 # Setup logging config
 setup_logging()
@@ -30,7 +37,39 @@ def get_client_ip(request: Request) -> str:
 async def lifespan(app: FastAPI):
     # Startup actions
     logger.info("Initializing database tables...")
+    import app.models
     Base.metadata.create_all(bind=engine)
+    
+    def _init_roles_and_permissions():
+        from app.core.database import SessionLocal
+        from app.models.rbac import Role, Permission
+        from app.core.rbac import ROLE_PERMISSIONS
+        db = SessionLocal()
+        try:
+            for role_name, perms in ROLE_PERMISSIONS.items():
+                role = db.query(Role).filter(Role.name == role_name).first()
+                if not role:
+                    role = Role(name=role_name)
+                    db.add(role)
+                    db.commit()
+                    db.refresh(role)
+                for p_name in perms:
+                    perm = db.query(Permission).filter(Permission.name == p_name).first()
+                    if not perm:
+                        perm = Permission(name=p_name)
+                        db.add(perm)
+                        db.commit()
+                        db.refresh(perm)
+                    if perm not in role.permissions:
+                        role.permissions.append(perm)
+            db.commit()
+        except Exception as e:
+            logger.error(f"Error initializing RBAC: {e}")
+        finally:
+            db.close()
+
+    logger.info("Initializing default roles and permissions...")
+    _init_roles_and_permissions()
     
     logger.info("Starting MTD rotation scheduler...")
     await mtd_service.start_rotation_scheduler()
@@ -48,6 +87,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS configuration
 if settings.BACKEND_CORS_ORIGINS:
@@ -87,8 +129,9 @@ async def mtd_middleware(request: Request, call_next):
         )
 
     # 2. Dynamic path decoding/rewriting
-    if path in mtd_service.active_routes:
-        real_path = mtd_service.active_routes[path]
+    active_routes = mtd_service.get_active_routes()
+    if path in active_routes:
+        real_path = active_routes[path]
         logger.info(f"MTD Router: translating dynamic path {path} -> {real_path}")
         
         # Rewrite the ASGI scope path so FastAPI routers match the real endpoint
@@ -98,6 +141,13 @@ async def mtd_middleware(request: Request, call_next):
         
         response = await call_next(request)
         return response
+        
+    if mtd_service.is_deprecated_route(path):
+        logger.warning(f"Access to deprecated dynamic route: {path}")
+        return JSONResponse(
+            status_code=status.HTTP_410_GONE,
+            content={"detail": "This endpoint has rotated and is no longer available. Please request the new endpoint."}
+        )
 
     # 3. Direct access block for protected paths
     if path in mtd_service.protected_paths:
@@ -171,6 +221,9 @@ app.include_router(mtd_router, prefix=settings.API_V1_STR)
 app.include_router(video_router, prefix=settings.API_V1_STR)
 app.include_router(alerts_router, prefix=settings.API_V1_STR)
 app.include_router(security_analytics_router, prefix=settings.API_V1_STR)
+app.include_router(notifications_router, prefix=settings.API_V1_STR)
+app.include_router(audit_router, prefix=settings.API_V1_STR)
+app.include_router(rbac_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

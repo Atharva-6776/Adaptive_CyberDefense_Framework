@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ShieldAlert, CheckCircle2, Clock, Loader2, RefreshCw, Search } from "lucide-react";
+import { ShieldAlert, CheckCircle2, Clock, Loader2, RefreshCw } from "lucide-react";
 import { getAlerts, resolveAlert } from "../api/alerts";
 import type { Alert } from "../types/dashboard";
 import { toast } from "sonner";

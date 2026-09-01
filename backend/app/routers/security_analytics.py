@@ -22,21 +22,19 @@ from app.schemas.security_analytics import (
     ThreatDetail,
     ThreatEventOut,
     ThreatScoreOut,
+    ThreatBlockOut,
+    ManualBlockRequest,
 )
 from app.services.risk_engine import risk_engine
-from app.utils.deps import get_current_user, get_db
+from app.services.audit_service import audit_service
+from app.utils.deps import get_current_user, get_db, RequirePermission
 from app.models.user import User
 
 router = APIRouter(prefix="/security", tags=["Security Analytics"])
 
-
-def _require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
-    return current_user
+require_security_monitoring = RequirePermission("security_monitoring")
+require_threat_management = RequirePermission("threat_management")
+require_ip_blocking = RequirePermission("ip_blocking")
 
 
 # ── GET /security/threats ──────────────────────────────────────────────────────
@@ -44,7 +42,7 @@ def _require_admin(current_user: User = Depends(get_current_user)) -> User:
 @router.get("/threats", response_model=List[ThreatScoreOut])
 def list_active_threats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_security_monitoring),
 ):
     """Return all tracked IPs ordered by current risk score (descending)."""
     scores = (
@@ -61,7 +59,7 @@ def list_active_threats(
 def get_threat_detail(
     ip_address: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_security_monitoring),
 ):
     """Return the risk score and full event timeline for a specific IP."""
     score_rec = db.query(ThreatScore).filter(
@@ -88,7 +86,7 @@ def get_threat_detail(
 @router.get("/metrics", response_model=SecurityMetrics)
 def get_security_metrics(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_security_monitoring),
 ):
     """Return aggregated dashboard metrics."""
     now = datetime.utcnow()
@@ -151,11 +149,138 @@ def get_security_metrics(
 @router.post("/recalculate", response_model=RecalculateResponse)
 def recalculate_scores(
     db: Session = Depends(get_db),
-    current_user: User = Depends(_require_admin),
+    current_user: User = Depends(require_threat_management),
 ):
     """Admin only — manually trigger score recalculation with decay applied."""
     updated = risk_engine.recalculate_all(db)
+    
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="recalculate_scores",
+        resource="risk_engine",
+        result="success",
+        metadata={"updated_count": updated}
+    )
+    
     return RecalculateResponse(
         recalculated=updated,
         message=f"Recalculated {updated} threat scores with decay applied.",
     )
+
+
+# ── GET /security/blocks ───────────────────────────────────────────────────────
+
+@router.get("/blocks", response_model=List[ThreatBlockOut])
+def list_blocks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_security_monitoring),
+):
+    """Return all threat block history."""
+    blocks = db.query(ThreatBlock).order_by(ThreatBlock.last_seen.desc()).all()
+    return blocks
+
+
+# ── POST /security/blocks/{ip}/block ───────────────────────────────────────────
+
+@router.post("/blocks/{ip_address}/block", response_model=ThreatBlockOut)
+def manual_block_ip(
+    ip_address: str,
+    req: ManualBlockRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_ip_blocking),
+):
+    """Admin only — manually block an IP address."""
+    from datetime import timezone
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    expires_at = now + timedelta(minutes=req.duration_minutes)
+
+    block = db.query(ThreatBlock).filter(ThreatBlock.ip_address == ip_address).first()
+    if not block:
+        block = ThreatBlock(
+            ip_address=ip_address,
+            reason=req.reason,
+            threat_score=100,
+            hit_count=1,
+            status="blocked",
+            first_seen=now,
+            last_seen=now,
+            blocked_at=now,
+            expires_at=expires_at,
+        )
+        db.add(block)
+    else:
+        block.status = "blocked"
+        block.reason = req.reason
+        block.last_seen = now
+        block.blocked_at = now
+        block.expires_at = expires_at
+
+    # Check if a ThreatScore exists and link it
+    score_rec = db.query(ThreatScore).filter(ThreatScore.ip_address == ip_address).first()
+    if score_rec:
+        score_rec.threat_level = "CRITICAL"
+        score_rec.current_score = max(score_rec.current_score, 100.0)
+        
+    db.flush()
+    if score_rec:
+        score_rec.active_block_id = block.id
+
+    from app.services.threat_mitigation import threat_mitigation_service
+    threat_mitigation_service._blocked_cache[ip_address] = expires_at
+
+    db.commit()
+    db.refresh(block)
+    
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="block_ip",
+        resource=f"ip:{ip_address}",
+        result="success",
+        metadata={"reason": req.reason, "duration_minutes": req.duration_minutes}
+    )
+    
+    return block
+
+
+# ── POST /security/blocks/{ip}/unblock ─────────────────────────────────────────
+
+@router.post("/blocks/{ip_address}/unblock", response_model=ThreatBlockOut)
+def manual_unblock_ip(
+    ip_address: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_ip_blocking),
+):
+    """Admin only — manually unblock an IP address."""
+    block = db.query(ThreatBlock).filter(ThreatBlock.ip_address == ip_address).first()
+    if not block:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No block record found for IP {ip_address}",
+        )
+
+    block.status = "unblocked"
+    # Do not reset expires_at so history remains clear
+
+    score_rec = db.query(ThreatScore).filter(ThreatScore.ip_address == ip_address).first()
+    if score_rec:
+        score_rec.active_block_id = None
+        # Maybe lower score slightly or leave it to decay
+
+    from app.services.threat_mitigation import threat_mitigation_service
+    if ip_address in threat_mitigation_service._blocked_cache:
+        del threat_mitigation_service._blocked_cache[ip_address]
+
+    db.commit()
+    db.refresh(block)
+    
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="unblock_ip",
+        resource=f"ip:{ip_address}",
+        result="success"
+    )
+    
+    return block

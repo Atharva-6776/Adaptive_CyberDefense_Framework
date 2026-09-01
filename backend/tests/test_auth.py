@@ -115,7 +115,7 @@ def test_refresh_token_success(client):
     assert refresh_resp.status_code == status.HTTP_200_OK
     new_tokens = refresh_resp.json()
     assert "access_token" in new_tokens
-    assert new_tokens["refresh_token"] == refresh_token
+    assert new_tokens["refresh_token"] != refresh_token
 
 
 def test_logout_and_blacklist(client):

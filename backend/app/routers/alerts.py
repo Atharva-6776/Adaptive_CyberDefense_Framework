@@ -4,12 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.schemas.alerts import AlertCreate, AlertUpdateStatus, AlertResponse
 from app.services.alert_service import alert_service
-from app.utils.deps import get_db, get_current_user
+from app.utils.deps import get_db, get_current_user, RequirePermission
 from app.models.user import User
+from app.services.audit_service import audit_service
 
 logger = logging.getLogger("alerts_router")
 
 router = APIRouter(prefix="/alerts", tags=["Safety Violation Alerts"])
+
+require_alert_resolution = RequirePermission("alert_resolution")
 
 
 @router.get("", response_model=List[AlertResponse])
@@ -40,10 +43,20 @@ def get_alert(alert_id: int, db: Session = Depends(get_db), current_user: User =
 
 
 @router.put("/{alert_id}/resolve", response_model=AlertResponse)
-def resolve_alert_status(alert_id: int, update_data: AlertUpdateStatus, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def resolve_alert_status(alert_id: int, update_data: AlertUpdateStatus, db: Session = Depends(get_db), current_user: User = Depends(require_alert_resolution)):
     """Update status of a safety alert (e.g. resolve it or mark as investigating)."""
     alert = alert_service.update_alert_status(db, alert_id, update_data.status)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     logger.info(f"Updated status for Alert {alert_id} to '{update_data.status}' by {current_user.email}")
+    
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="resolve_alert",
+        resource=f"alert:{alert_id}",
+        result="success",
+        metadata={"new_status": update_data.status}
+    )
+    
     return AlertResponse.model_validate(alert)

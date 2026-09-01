@@ -77,6 +77,20 @@ class AlertService:
         logger.warning(
             f"SAFETY ALERT REGISTERED: Camera {alert_data.camera_id} ({camera.name if camera else 'Unknown'}), Violation: {alert_data.violation_type}"
         )
+
+        if alert_data.severity.lower() == "critical":
+            try:
+                from app.services.notification_dispatcher import notification_dispatcher
+                notification_dispatcher.dispatch(
+                    db=db,
+                    event_type="safety_yolo_critical",
+                    subject=f"CRITICAL Safety Alert: {alert_data.title}",
+                    message=f"Camera ID: {alert_data.camera_id}\nViolation: {alert_data.violation_type}\nDescription: {alert_data.description}",
+                    reference_id=str(db_alert.id)
+                )
+            except Exception as e:
+                logger.error(f"[AlertService] Failed to dispatch critical alert: {e}")
+
         return db_alert
 
     def get_alerts(self, db: Session, skip: int = 0, limit: int = 100) -> List[Alert]:

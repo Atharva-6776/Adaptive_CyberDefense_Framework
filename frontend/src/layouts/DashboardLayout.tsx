@@ -4,6 +4,7 @@ import {
   Camera,
   TriangleAlert,
   Shield,
+  Activity,
   FileBarChart,
   Settings,
   LogOut,
@@ -16,6 +17,7 @@ const menuItems = [
   { name: "Cameras", path: "/cameras", icon: Camera },
   { name: "Alerts", path: "/alerts", icon: TriangleAlert },
   { name: "Security", path: "/security", icon: Shield },
+  { name: "Threat Analytics", path: "/threats", icon: Activity },
   { name: "Reports", path: "/reports", icon: FileBarChart },
   { name: "Settings", path: "/settings", icon: Settings },
 ];

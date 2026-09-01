@@ -9,6 +9,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["JWT_SECRET_KEY"] = "testaccesssecretkey"
 os.environ["JWT_REFRESH_SECRET_KEY"] = "testrefreshsecretkey"
 os.environ["MTD_ROTATION_INTERVAL_SECONDS"] = "2"  # Make it fast for tests
+os.environ["TESTING"] = "1"
 
 from app.main import app
 from app.core.database import Base

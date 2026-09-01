@@ -3,10 +3,13 @@ from sqlalchemy.orm import Session
 
 from app.schemas.mtd import MTDStatusResponse, HoneypotLogEntry
 from app.services.mtd_service import mtd_service
-from app.utils.deps import get_db, get_current_user
+from app.utils.deps import get_db, get_current_user, RequirePermission
 from app.models.user import User
+from app.services.audit_service import audit_service
 
 router = APIRouter(prefix="/mtd", tags=["Moving Target Defense"])
+
+require_mtd_configuration = RequirePermission("mtd_configuration")
 
 
 @router.get("/status", response_model=MTDStatusResponse)
@@ -29,10 +32,22 @@ def get_honeypot_logs(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/rotate", status_code=status.HTTP_200_OK)
-def trigger_manual_rotation(current_user: User = Depends(get_current_user)):
+def trigger_manual_rotation(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_mtd_configuration)
+):
     """
     Manually trigger an immediate dynamic API path rotation.
-    Requires authenticated user.
+    Requires authenticated user with mtd_configuration permission.
     """
     mtd_service.rotate_paths()
+    
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="mtd_rotation",
+        resource="mtd_service",
+        result="success"
+    )
+    
     return {"message": "MTD path rotation triggered successfully", "status": mtd_service.get_status()}

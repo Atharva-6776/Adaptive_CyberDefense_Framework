@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.threat_block import ThreatBlock
 from app.services.mtd_service import mtd_service
+from app.core.redis import redis_client
 
 logger = logging.getLogger("security")
 
@@ -96,7 +97,11 @@ class ThreatMitigationService:
             block_record.expires_at = expires_at
             
             # Update cache
-            self._blocked_cache[ip_address] = expires_at
+            redis_cache = redis_client.get_client()
+            if redis_cache:
+                redis_cache.setex(f"block:{ip_address}", settings.THREAT_BLOCK_DURATION_SECONDS, "blocked")
+            else:
+                self._blocked_cache[ip_address] = expires_at
             
             logger.warning(
                 f"ATTACK MITIGATION: IP {ip_address} has triggered {recent_hits} decoy events "
@@ -117,13 +122,18 @@ class ThreatMitigationService:
         """
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        # 1. Check in-memory cache first
-        if ip_address in self._blocked_cache:
-            expires_at = self._blocked_cache[ip_address]
-            if now <= expires_at:
+        # 1. Check Redis / in-memory cache first
+        redis_cache = redis_client.get_client()
+        if redis_cache:
+            if redis_cache.exists(f"block:{ip_address}"):
                 return True
-            else:
-                del self._blocked_cache[ip_address]
+        else:
+            if ip_address in self._blocked_cache:
+                expires_at = self._blocked_cache[ip_address]
+                if now <= expires_at:
+                    return True
+                else:
+                    del self._blocked_cache[ip_address]
 
         # 2. Check Database
         block_record = db.query(ThreatBlock).filter(
@@ -142,7 +152,13 @@ class ThreatMitigationService:
                 return False
             else:
                 # Active block in DB, populate cache
-                self._blocked_cache[ip_address] = db_expires_at
+                remaining_seconds = int((db_expires_at - now).total_seconds())
+                if remaining_seconds > 0:
+                    redis_cache = redis_client.get_client()
+                    if redis_cache:
+                        redis_cache.setex(f"block:{ip_address}", remaining_seconds, "blocked")
+                    else:
+                        self._blocked_cache[ip_address] = db_expires_at
                 return True
 
         return False

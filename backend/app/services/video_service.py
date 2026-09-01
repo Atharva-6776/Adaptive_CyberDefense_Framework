@@ -330,7 +330,7 @@ class VideoService:
             severity="high",
             status="active",
             description=description,
-            evidence_path=f"/uploads/alerts/cam_{camera_id}_{violation_type}.jpg"  # Mock evidence path
+            evidence_path=f"/uploads/alerts/cam_{camera_id}_{violation_type}.jpg"
         )
         alert_service.create_alert(db, alert_data)
 

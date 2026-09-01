@@ -79,45 +79,88 @@ class MTDService:
             logger.info("MTD is disabled. Skipping path rotation.")
             return
 
-        self.load_config()
-        salt = secrets.token_hex(8)
-        new_active_routes = {}
-        new_reverse_active_routes = {}
-        now = datetime.now(timezone.utc)
+        from app.core.redis import redis_client
+        r = redis_client.get_client()
+        lock = None
+        if r:
+            lock = r.lock("mtd:rotation_lock", timeout=10)
+            if not lock.acquire(blocking=False):
+                logger.info("Another worker is currently rotating MTD paths, skipping.")
+                return
 
-        # Deprecate old routes in history
-        for dyn_path, real_path in self.active_routes.items():
-            # Check if already in history
-            exists = any(h.dynamic_path == dyn_path and h.status == "active" for h in self.history)
-            if exists:
-                for h in self.history:
-                    if h.dynamic_path == dyn_path:
-                        h.status = "deprecated"
+        try:
+            self.load_config()
+            salt = secrets.token_hex(8)
+            new_active_routes = {}
+            new_reverse_active_routes = {}
+            now = datetime.now(timezone.utc)
 
-        # Generate new routes
-        for real_path in self.protected_paths:
-            dyn_path = self.generate_dynamic_path(real_path, salt)
-            new_active_routes[dyn_path] = real_path
-            new_reverse_active_routes[real_path] = dyn_path
+            # Deprecate old routes in history
+            for dyn_path, real_path in self.active_routes.items():
+                # Check if already in history
+                exists = any(h.dynamic_path == dyn_path and h.status == "active" for h in self.history)
+                if exists:
+                    for h in self.history:
+                        if h.dynamic_path == dyn_path:
+                            h.status = "deprecated"
+
+            # Generate new routes
+            for real_path in self.protected_paths:
+                dyn_path = self.generate_dynamic_path(real_path, salt)
+                new_active_routes[dyn_path] = real_path
+                new_reverse_active_routes[real_path] = dyn_path
+                
+                # Record rotation in history
+                rotation_info = PathRotationInfo(
+                    dynamic_path=dyn_path,
+                    target_handler=real_path,
+                    created_at=now,
+                    status="active"
+                )
+                self.history.append(rotation_info)
+
+            # Maintain history limit
+            if len(self.history) > settings.MTD_ROTATION_HISTORY_LIMIT:
+                self.history = self.history[-settings.MTD_ROTATION_HISTORY_LIMIT:]
+
+            self.active_routes = new_active_routes
+            self.reverse_active_routes = new_reverse_active_routes
+            self.last_rotation = now
             
-            # Record rotation in history
-            rotation_info = PathRotationInfo(
-                dynamic_path=dyn_path,
-                target_handler=real_path,
-                created_at=now,
-                status="active"
-            )
-            self.history.append(rotation_info)
+            from app.core.redis import redis_client
+            r = redis_client.get_client()
+            if r:
+                if r.exists("mtd:active_routes"):
+                    r.delete("mtd:active_routes")
+                if r.exists("mtd:reverse_routes"):
+                    r.delete("mtd:reverse_routes")
+                    
+                if new_active_routes:
+                    r.hset("mtd:active_routes", mapping=new_active_routes)
+                    r.hset("mtd:reverse_routes", mapping=new_reverse_active_routes)
+                    
+                # Add deprecated routes to set
+                for dyn_path in new_active_routes:
+                    r.sadd("mtd:deprecated_routes", dyn_path)
 
-        # Maintain history limit
-        if len(self.history) > settings.MTD_ROTATION_HISTORY_LIMIT:
-            self.history = self.history[-settings.MTD_ROTATION_HISTORY_LIMIT:]
+            logger.info(f"MTD Path Rotation executed. Active dynamic routes: {self.get_active_routes()}")
+        finally:
+            if lock and lock.owned():
+                lock.release()
 
-        self.active_routes = new_active_routes
-        self.reverse_active_routes = new_reverse_active_routes
-        self.last_rotation = now
+    def get_active_routes(self) -> Dict[str, str]:
+        from app.core.redis import redis_client
+        r = redis_client.get_client()
+        if r:
+            return r.hgetall("mtd:active_routes") or self.active_routes
+        return self.active_routes
 
-        logger.info(f"MTD Path Rotation executed. Active dynamic routes: {self.active_routes}")
+    def is_deprecated_route(self, path: str) -> bool:
+        from app.core.redis import redis_client
+        r = redis_client.get_client()
+        if r:
+            return r.sismember("mtd:deprecated_routes", path)
+        return any(h.dynamic_path == path and h.status == "deprecated" for h in self.history)
 
     async def start_rotation_scheduler(self) -> None:
         """Starts the background task to periodically rotate paths."""

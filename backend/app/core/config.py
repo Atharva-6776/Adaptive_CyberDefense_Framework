@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "cyberdefense"
     DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/cyberdefense"
+    REDIS_URL: str = ""
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -49,7 +50,12 @@ class Settings(BaseSettings):
         "/api/v1/system/env",
         "/api/v1/auth/keys",
         "/api/v1/database/export",
-        "/api/v1/config/credentials"
+        "/api/v1/config/credentials",
+        "/api/v1/admin/backup",
+        "/api/v1/phpinfo.php",
+        "/api/v1/wp-admin",
+        "/api/v1/.env",
+        "/api/v1/ssh_keys"
     ]
     MTD_SEED: str = "adaptive-defense-framework-seed"
     MTD_ROTATION_HISTORY_LIMIT: int = 10
@@ -61,6 +67,19 @@ class Settings(BaseSettings):
     THREAT_DETECTION_WINDOW_SECONDS: int = 10
     THREAT_HONEYPOT_THRESHOLD: int = 3
     THREAT_BLOCK_DURATION_SECONDS: int = 600
+
+    # Notification & Alerting Settings
+    ALERT_DISPATCH_ENABLED: bool = True
+    ALERT_COOLDOWN_SECONDS: int = 300
+    ALERT_EMAIL_ENABLED: bool = False
+    ALERT_EMAIL_SMTP_HOST: str = "smtp.example.com"
+    ALERT_EMAIL_SMTP_PORT: int = 587
+    ALERT_EMAIL_SMTP_USER: str = ""
+    ALERT_EMAIL_SMTP_PASSWORD: str = ""
+    ALERT_EMAIL_FROM: str = "alerts@cyberdefense.local"
+    ALERT_EMAIL_TO: str = "admin@cyberdefense.local"
+    ALERT_SLACK_ENABLED: bool = False
+    ALERT_SLACK_WEBHOOK_URL: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

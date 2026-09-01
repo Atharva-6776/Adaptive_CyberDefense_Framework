@@ -78,23 +78,30 @@ def get_current_user(
     return user
 
 
-class RoleChecker:
-    def __init__(self, allowed_roles: List[str]):
-        self.allowed_roles = allowed_roles
+from app.core.rbac import ROLE_PERMISSIONS
 
-    def __call__(self, current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in self.allowed_roles:
+class RequirePermission:
+    def __init__(self, required_permission: str):
+        self.required_permission = required_permission
+
+    def __call__(self, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+        from app.models.rbac import Role
+        
+        role = db.query(Role).filter(Role.name == current_user.role).first()
+        user_permissions = [p.name for p in role.permissions] if role else []
+        
+        if self.required_permission not in user_permissions:
             logger.warning(
-                f"Unauthorized role access attempt: User {current_user.email} (role: {current_user.role}) "
-                f"tried accessing restricted endpoint. Allowed: {self.allowed_roles}"
+                f"Unauthorized permission access attempt: User {current_user.email} (role: {current_user.role}) "
+                f"tried accessing '{self.required_permission}'. Allowed: {user_permissions}"
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Operation not permitted for this user role"
+                detail="Operation not permitted for this user's permissions"
             )
         return current_user
 
 
-# Role dependency factories
-require_admin = RoleChecker(["admin"])
-require_analyst_or_admin = RoleChecker(["admin", "analyst"])
+# Backwards compatibility wrappers or specific permission checkers
+require_admin = RequirePermission("system_administration")
+require_analyst_or_admin = RequirePermission("threat_management")

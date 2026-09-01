@@ -61,11 +61,11 @@ def test_manual_rotation(client):
     # Register and login
     client.post(
         "/api/v1/auth/register",
-        json={"email": "analyst@defense.com", "password": "securepassword123"}
+        json={"email": "admin2@defense.com", "password": "securepassword123", "role": "admin"}
     )
     login_resp = client.post(
         "/api/v1/auth/login",
-        json={"email": "analyst@defense.com", "password": "securepassword123"}
+        json={"email": "admin2@defense.com", "password": "securepassword123"}
     )
     access_token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {access_token}"}

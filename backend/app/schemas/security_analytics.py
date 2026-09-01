@@ -58,3 +58,26 @@ class SecurityMetrics(BaseModel):
 class RecalculateResponse(BaseModel):
     recalculated: int
     message: str
+
+
+# ─── Block Management ──────────────────────────────────────────────────────────
+
+class ThreatBlockOut(BaseModel):
+    id: int
+    ip_address: str
+    reason: Optional[str] = None
+    threat_score: int
+    hit_count: int
+    first_seen: datetime
+    last_seen: datetime
+    blocked_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    status: str
+
+    class Config:
+        from_attributes = True
+
+class ManualBlockRequest(BaseModel):
+    reason: Optional[str] = "Manual admin block"
+    duration_minutes: Optional[int] = 60
+
