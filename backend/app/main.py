@@ -12,9 +12,14 @@ from app.routers.mtd import router as mtd_router
 from app.routers.video import router as video_router
 from app.routers.alerts import router as alerts_router
 from app.routers.security_analytics import router as security_analytics_router
+<<<<<<< HEAD
 from app.routers.notifications import router as notifications_router
 from app.routers.audit import router as audit_router
 from app.routers.rbac import router as rbac_router
+=======
+from app.routers.reports import router as reports_router
+from app.routers.settings import router as settings_router
+>>>>>>> origin/main
 from app.services.mtd_service import mtd_service
 
 from slowapi.errors import RateLimitExceeded
@@ -221,9 +226,14 @@ app.include_router(mtd_router, prefix=settings.API_V1_STR)
 app.include_router(video_router, prefix=settings.API_V1_STR)
 app.include_router(alerts_router, prefix=settings.API_V1_STR)
 app.include_router(security_analytics_router, prefix=settings.API_V1_STR)
+<<<<<<< HEAD
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
 app.include_router(rbac_router, prefix=settings.API_V1_STR)
+=======
+app.include_router(reports_router, prefix=settings.API_V1_STR)
+app.include_router(settings_router, prefix=settings.API_V1_STR)
+>>>>>>> origin/main
 
 
 @app.get("/")

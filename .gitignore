@@ -5,8 +5,14 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
 # Environment
 .env
+backend/.env
 
 # VS Code
 .vscode/

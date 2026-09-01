@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { login as loginApi, getCurrentUser } from "../api/auth";
 import { Shield, AlertCircle, Loader2 } from "lucide-react";
+import { CyberDefenseBackground } from "../components/3d/CyberDefenseBackground";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -49,8 +50,9 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-white">
-      <div className="w-full max-w-md space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl backdrop-blur-sm">
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-950/80 p-4 text-white">
+      <CyberDefenseBackground />
+      <div className="relative z-10 w-full max-w-md space-y-6 rounded-2xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-md">
         {/* Title / Branding */}
         <div className="text-center space-y-2">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30">
