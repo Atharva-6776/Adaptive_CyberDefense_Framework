@@ -70,8 +70,13 @@ class AuthService:
         return user
 
     @staticmethod
-    def create_tokens_for_user(db: Session, user: User, ip_address: str = None, device_info: str = None) -> TokenResponse:
-        from app.models.user import ActiveSession
+    def create_tokens_for_user(db: Any, user: User = None, ip_address: str = None, device_info: str = None) -> TokenResponse:
+        from sqlalchemy.orm import object_session
+        from app.models.user import ActiveSession, User as UserModel
+        if isinstance(db, UserModel):
+            user = db
+            db = object_session(user)
+
         access_token = create_access_token(user_id=user.id, role=user.role)
         refresh_token = create_refresh_token(user_id=user.id, role=user.role)
         
@@ -82,15 +87,16 @@ class AuthService:
         except Exception:
             expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
-        session_entry = ActiveSession(
-            user_id=user.id,
-            refresh_token=refresh_token,
-            ip_address=ip_address,
-            device_info=device_info,
-            expires_at=expires_at
-        )
-        db.add(session_entry)
-        db.commit()
+        if db is not None:
+            session_entry = ActiveSession(
+                user_id=user.id,
+                refresh_token=refresh_token,
+                ip_address=ip_address,
+                device_info=device_info,
+                expires_at=expires_at
+            )
+            db.add(session_entry)
+            db.commit()
         
         return TokenResponse(
             access_token=access_token,
