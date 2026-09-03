@@ -33,19 +33,18 @@ class ReportService:
         ip_address: Optional[str] = None,
     ) -> AuditLog:
         """Helper to create and save an audit log entry."""
-        audit = AuditLog(
+        from app.services.audit_service import audit_service
+        meta = {"details": details, "user_email": user.email if user else "system"}
+        if ip_address:
+            meta["ip_address"] = ip_address
+        return audit_service.log_action(
+            db=db,
             user_id=user.id if user else None,
-            user_email=user.email if user else "system",
             action=action,
             resource=resource,
-            details=details,
-            ip_address=ip_address,
-            timestamp=datetime.now(timezone.utc),
+            result="success",
+            metadata=meta
         )
-        db.add(audit)
-        db.commit()
-        db.refresh(audit)
-        return audit
 
     def get_telemetry_summary(self, db: Session) -> ReportSummary:
         """Collects real aggregate telemetry stats across all security modules."""
@@ -280,14 +279,15 @@ class ReportService:
             }
 
             for l in logs:
+                meta = json.loads(l.metadata_json) if l.metadata_json else {}
                 data.append({
                     "category": "AuditLog",
                     "id": l.id,
-                    "user_email": l.user_email,
+                    "user_email": meta.get("user_email", l.user.email if l.user else "system"),
                     "action": l.action,
                     "resource": l.resource,
-                    "details": l.details,
-                    "ip_address": l.ip_address,
+                    "details": meta.get("details"),
+                    "ip_address": meta.get("ip_address"),
                     "timestamp": l.timestamp.isoformat() if l.timestamp else None,
                 })
         else:
