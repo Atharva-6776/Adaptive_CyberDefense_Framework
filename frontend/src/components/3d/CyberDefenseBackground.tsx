@@ -4,13 +4,11 @@ import { SceneContent } from "./SceneContent";
 
 interface CyberDefenseBackgroundProps {
   scrollProgress?: number;
-  securityState?: "normal" | "warning" | "critical" | "blocked";
   children?: ReactNode;
 }
 
 export function CyberDefenseBackground({
   scrollProgress = 0,
-  securityState = "normal",
 }: CyberDefenseBackgroundProps) {
   const [isActive, setIsActive] = useState(true);
   const [webglSupported, setWebglSupported] = useState(true);
@@ -61,10 +59,7 @@ export function CyberDefenseBackground({
         frameloop={isActive ? "always" : "never"}
         style={{ pointerEvents: "none" }}
       >
-        <SceneContent
-          scrollProgress={scrollProgress}
-          securityState={securityState}
-        />
+        <SceneContent scrollProgress={scrollProgress} />
       </Canvas>
     </div>
   );

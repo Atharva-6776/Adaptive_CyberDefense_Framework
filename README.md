@@ -1,6 +1,6 @@
-# PAHAREKARI — Adaptive Cyber Defense & PPE Surveillance Framework
+# Adaptive Cyber Defense Framework
 
-PAHAREKARI is a full-stack, enterprise safety surveillance and cyber defense framework. It integrates **Moving Target Defense (MTD)** dynamic API route rotation, **honeypot decoy traps**, and a real-time **YOLOv8 PPE compliance video pipeline**.
+Adaptive Cyber Defense is a full-stack, enterprise safety surveillance and cyber defense framework. It integrates **Moving Target Defense (MTD)** dynamic API route rotation, **honeypot decoy traps**, and a real-time **YOLOv8 PPE compliance video pipeline**.
 
 ---
 
@@ -8,10 +8,16 @@ PAHAREKARI is a full-stack, enterprise safety surveillance and cyber defense fra
 
 For a detailed analysis of workflows, refer to the [ARCHITECTURE.md](docs/ARCHITECTURE.md) document.
 
-* **Frontend**: React, TypeScript, TailwindCSS, Zustand, Lucide icons, and Axios.
+* **Frontend**: React, Vite, TypeScript, TailwindCSS, Zustand, Lucide icons, Framer Motion, and Axios.
 * **Backend**: FastAPI, Python 3.10+, SQLAlchemy, Alembic migrations, and Uvicorn.
 * **Database**: PostgreSQL (Dockerized) or SQLite (local developer fallback).
-* **AI Engine**: YOLOv8 (`ultralytics`) using a pre-trained PPE model (`best.pt`) and OpenCV.
+* **AI Engine**: YOLOv8 (ultralytics) using a pre-trained PPE model (est.pt) and OpenCV.
+
+### Frontend Features
+* **Light Enterprise Theme**: A clean, professional, and dense information design utilizing white backgrounds, light gray borders, and a primary blue (#2563EB) accent.
+* **Icon Navigation Rail**: A slim, responsive 68px sidebar presenting icons with accessible tooltips, freeing up dashboard space for data.
+* **Command Palette**: A global Cmd/Ctrl + K interface using cmdk for rapid route and action discovery.
+* **Motion & Animations**: Subtle framer-motion scroll reveals and route transitions, combined with a performant pure-CSS animated gradient mesh background. Features full prefers-reduced-motion accessibility support.
 
 ---
 
@@ -25,28 +31,28 @@ For a detailed analysis of workflows, refer to the [ARCHITECTURE.md](docs/ARCHIT
 
 ## 3. Environment Setup
 
-Copy `.env.example` to `.env` in the root directory:
+Copy .env.example to .env in the root directory:
 
-```bash
+`ash
 cp .env.example .env
-```
+`
 
 Review and adjust variables as needed:
-* `DATABASE_URL`: PostgreSQL connection string.
-* `JWT_SECRET_KEY`: Random secret string for JWT access tokens.
-* `JWT_REFRESH_SECRET_KEY`: Random secret string for JWT refresh tokens.
-* `MODEL_PATH`: Directory location of the YOLO PPE model `best.pt`.
-* `MTD_ENABLED`: Toggle MTD route protection.
+* DATABASE_URL: PostgreSQL connection string.
+* JWT_SECRET_KEY: Random secret string for JWT access tokens.
+* JWT_REFRESH_SECRET_KEY: Random secret string for JWT refresh tokens.
+* MODEL_PATH: Directory location of the YOLO PPE model est.pt.
+* MTD_ENABLED: Toggle MTD route protection.
 
 ---
 
 ## 4. YOLO Model Placement
 
-Before starting the system or video streams, place your trained YOLO PPE detection model (`best.pt`) in the designated folder:
+Before starting the system or video streams, place your trained YOLO PPE detection model (est.pt) in the designated folder:
 
-* **File Location**: `ai-engine/models/best.pt`
+* **File Location**: i-engine/models/best.pt
 
-If the model is not found at the location pointed by `MODEL_PATH` when starting a camera feed, the backend will raise a clear configuration error.
+If the model is not found at the location pointed by MODEL_PATH when starting a camera feed, the backend will raise a clear configuration error.
 
 ---
 
@@ -56,9 +62,9 @@ If the model is not found at the location pointed by `MODEL_PATH` when starting 
 
 To run the database, backend, and frontend concurrently:
 
-```bash
+`ash
 docker compose up --build
-```
+`
 
 Access the applications:
 * **Frontend UI**: [http://localhost:8080](http://localhost:8080)
@@ -67,24 +73,24 @@ Access the applications:
 ### Option B: Local Development Setup
 
 #### 1. Start the Database
-Either run a local PostgreSQL service or let the backend automatically fall back to its SQLite database (`backend/app.db`) for developer ease.
+Either run a local PostgreSQL service or let the backend automatically fall back to its SQLite database (ackend/app.db) for developer ease.
 
 #### 2. Run Backend API
-```bash
+`ash
 cd backend
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
 python -m pytest   # Run tests
 uvicorn app.main:app --reload
-```
+`
 
 #### 3. Run Frontend Dev Server
-```bash
+`ash
 cd frontend
 npm install
 npm run dev
-```
+`
 Open [http://localhost:5173](http://localhost:5173).
 
 ---
@@ -94,10 +100,10 @@ Open [http://localhost:5173](http://localhost:5173).
 ### Run Backend Tests
 Run the pytest suite inside the activated backend virtual environment:
 
-```bash
+`ash
 cd backend
 python -m pytest
-```
+`
 
 Included test categories:
 1. JWT register, login, refresh, logout, token blacklist.

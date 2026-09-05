@@ -1,6 +1,6 @@
-# PAHAREKARI — Architecture Specification
+# Adaptive Cyber Defense Framework — Architecture Specification
 
-This document details the architectural design and system workflows of the integrated PAHAREKARI Adaptive Cyber Security & Surveillance System.
+This document details the architectural design and system workflows of the integrated Adaptive Cyber Defense Framework Adaptive Cyber Security & Surveillance System.
 
 ## Architecture Diagram
 

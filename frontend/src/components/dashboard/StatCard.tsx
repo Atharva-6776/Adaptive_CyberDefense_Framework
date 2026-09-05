@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AnimatedCard } from "../AnimatedCard";
 
 interface StatCardProps {
   title: string;
@@ -7,6 +8,7 @@ interface StatCardProps {
   icon: ReactNode;
   trend?: string;
   trendPositive?: boolean;
+  delay?: number;
 }
 
 export default function StatCard({
@@ -16,49 +18,49 @@ export default function StatCard({
   icon,
   trend,
   trendPositive = true,
+  delay = 0,
 }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl backdrop-blur-sm transition duration-200 hover:border-slate-700 flex flex-col justify-between min-h-[130px]">
-      <div className="flex items-start justify-between gap-3 min-w-0">
-        {/* Text content – must shrink, never overflow */}
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 truncate">
-            {title}
-          </p>
+    <AnimatedCard delay={delay} className="h-full">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm transition duration-200 hover:shadow-md flex flex-col justify-between min-h-[130px] h-full">
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] truncate">
+              {title}
+            </p>
 
-          {/* Value row */}
-          <div className="mt-2 flex flex-wrap items-baseline gap-2 min-w-0">
-            <h2
-              className="font-bold text-white tracking-tight break-all"
-              style={{ fontSize: "clamp(1rem, 2.5vw, 1.5rem)", lineHeight: "1.3" }}
-            >
-              {value}
-            </h2>
-            {trend && (
-              <span
-                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight whitespace-nowrap border ${
-                  trendPositive
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                    : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                }`}
+            <div className="mt-2 flex flex-wrap items-baseline gap-2 min-w-0">
+              <h2
+                className="font-bold text-[var(--text-primary)] tracking-tight break-all"
+                style={{ fontSize: "clamp(1rem, 2.5vw, 1.5rem)", lineHeight: "1.3" }}
               >
-                {trend}
-              </span>
+                {value}
+              </h2>
+              {trend && (
+                <span
+                  className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight whitespace-nowrap border ${
+                    trendPositive
+                      ? "bg-[rgba(30,142,90,0.1)] text-[var(--success)] border-[rgba(30,142,90,0.2)]"
+                      : "bg-[rgba(201,79,79,0.1)] text-[var(--danger)] border-[rgba(201,79,79,0.2)]"
+                  }`}
+                >
+                  {trend}
+                </span>
+              )}
+            </div>
+
+            {subtitle && (
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)] break-words">
+                {subtitle}
+              </p>
             )}
           </div>
 
-          {subtitle && (
-            <p className="mt-1.5 text-xs text-slate-400 break-words">
-              {subtitle}
-            </p>
-          )}
-        </div>
-
-        {/* Icon container – fixed size, never squishes text */}
-        <div className="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-500/20 bg-cyan-950/40 shadow-inner">
-          {icon}
+          <div className="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[#F7F7F5] shadow-inner text-[var(--text-secondary)]">
+            {icon}
+          </div>
         </div>
       </div>
-    </div>
+    </AnimatedCard>
   );
 }

@@ -4,6 +4,7 @@ import StatCard from "../components/dashboard/StatCard";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import CameraOverview from "../components/dashboard/CameraOverview";
 import RecentAlerts from "../components/dashboard/RecentAlerts";
+import { AnimatedCard } from "../components/AnimatedCard";
 import { useAuthStore } from "../store/authStore";
 import { getMTDStatus, type MTDStatusResponse } from "../api/mtd";
 import { getCameras } from "../api/video";
@@ -61,16 +62,18 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {/* Authenticated User */}
         <StatCard
+          delay={0}
           title="Authenticated User"
           value={user?.email || "Unknown user"}
           subtitle={`Role: ${user?.role || "N/A"}`}
           trend="Authenticated"
           trendPositive={true}
-          icon={<UserCheck className="h-5 w-5 text-cyan-400" />}
+          icon={<UserCheck className="h-5 w-5 text-[var(--accent-blue)]" />}
         />
 
         {/* MTD Dynamic Defense Status */}
         <StatCard
+          delay={0.08}
           title="MTD Defense"
           value={loading ? "Loading…" : mtdStatus?.mtd_enabled ? "Enabled" : "Disabled"}
           subtitle={
@@ -80,34 +83,40 @@ export default function Dashboard() {
           }
           trend={mtdStatus?.mtd_enabled ? "Active Shuffling" : "Inactive"}
           trendPositive={!!mtdStatus?.mtd_enabled}
-          icon={<Shield className="h-5 w-5 text-emerald-400" />}
+          icon={<Shield className="h-5 w-5 text-[var(--success)]" />}
         />
 
         {/* Backend Availability */}
         <StatCard
+          delay={0.16}
           title="Backend Connection"
           value={error ? "Disconnected" : "Connected"}
           subtitle="FastAPI Core Engine"
           trend={error ? "Error" : "Online"}
           trendPositive={!error}
-          icon={<Server className="h-5 w-5 text-indigo-400" />}
+          icon={<Server className="h-5 w-5 text-[var(--info)]" />}
         />
 
         {/* Dynamic Routes Count */}
         <StatCard
+          delay={0.24}
           title="Active Dynamic Routes"
           value={mtdStatus ? Object.keys(mtdStatus.active_routes).length : 0}
           subtitle="Protected MTD Endpoints"
           trend="Dynamic Translation"
           trendPositive={true}
-          icon={<RefreshCw className="h-5 w-5 text-amber-400" />}
+          icon={<RefreshCw className="h-5 w-5 text-[var(--warning)]" />}
         />
       </div>
 
       {/* Live Video Analytics and Alert Panels */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <CameraOverview cameras={cameras} />
-        <RecentAlerts alerts={alerts} />
+        <AnimatedCard delay={0.1}>
+          <CameraOverview cameras={cameras} />
+        </AnimatedCard>
+        <AnimatedCard delay={0.2}>
+          <RecentAlerts alerts={alerts} />
+        </AnimatedCard>
       </div>
     </div>
   );

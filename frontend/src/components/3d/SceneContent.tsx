@@ -2,30 +2,20 @@ import { useRef, useEffect, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { CyberGrid } from "./CyberGrid";
-import { ParticleField } from "./ParticleField";
 import { CyberShieldStructure } from "./CyberShieldStructure";
-import { NetworkNodes } from "./NetworkNodes";
 
 interface SceneContentProps {
   scrollProgress: number;
-  securityState?: "normal" | "warning" | "critical" | "blocked";
 }
 
 export function SceneContent({
   scrollProgress,
-  securityState = "normal",
 }: SceneContentProps) {
   const { camera } = useThree();
   const mouseRef = useRef({ x: 0, y: 0 });
-  const [isMobile, setIsMobile] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
 
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReducedMotion(motionQuery.matches);
@@ -39,7 +29,6 @@ export function SceneContent({
     window.addEventListener("mousemove", handleMouseMove);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
       motionQuery.removeEventListener("change", motionHandler);
       window.removeEventListener("mousemove", handleMouseMove);
     };
@@ -72,16 +61,6 @@ export function SceneContent({
 
       {/* Cyber Environment Grid */}
       <CyberGrid scrollProgress={scrollProgress} />
-
-      {/* Ambient Floating Particles */}
-      <ParticleField scrollProgress={scrollProgress} isMobile={isMobile} />
-
-      {/* Interconnected Network Nodes */}
-      <NetworkNodes
-        scrollProgress={scrollProgress}
-        isMobile={isMobile}
-        securityState={securityState}
-      />
 
       {/* Cyber Defense Shield Structure */}
       <CyberShieldStructure scrollProgress={scrollProgress} />
